@@ -4,9 +4,8 @@ RUN dnf install -y \
     freeipa-client \
     openldap-clients \
     jq \
-    curl \
     bind-utils \
+    python3 \
     && dnf clean all
 
-# krb5.conf will be configured at runtime by ipa-client-install
 WORKDIR /tests

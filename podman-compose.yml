@@ -84,6 +84,7 @@ services:
     volumes:
       - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro,Z
       - freeipa-logs:/var/log/freeipa:ro
+      - freeipa-data:/data:ro
     depends_on:
       elasticsearch:
         condition: service_healthy

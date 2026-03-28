@@ -3,7 +3,7 @@ filebeat.inputs:
   - type: filestream
     id: freeipa-kdc
     paths:
-      - /var/log/freeipa/krb5kdc.log
+      - /data/var/log/krb5kdc.log
     fields:
       event.dataset: freeipa.kdc
     fields_under_root: true
