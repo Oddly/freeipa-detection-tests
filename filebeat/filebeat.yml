@@ -1,0 +1,72 @@
+filebeat.inputs:
+  # KDC logs (krb5kdc via syslog)
+  - type: filestream
+    id: freeipa-kdc
+    paths:
+      - /var/log/freeipa/krb5kdc.log
+    fields:
+      event.dataset: freeipa.kdc
+    fields_under_root: true
+    pipeline: freeipa-kdc
+
+  # 389DS access log
+  - type: filestream
+    id: freeipa-directory-access
+    paths:
+      - /var/log/freeipa/dirsrv/slapd-*/access
+    fields:
+      event.dataset: freeipa.directory_access
+    fields_under_root: true
+    pipeline: freeipa-directory_access
+
+  # 389DS errors log
+  - type: filestream
+    id: freeipa-directory-errors
+    paths:
+      - /var/log/freeipa/dirsrv/slapd-*/errors
+    fields:
+      event.dataset: freeipa.directory_errors
+    fields_under_root: true
+    pipeline: freeipa-directory_errors
+
+  # Dogtag CA signed audit log
+  - type: filestream
+    id: freeipa-ca-audit
+    paths:
+      - /var/log/freeipa/pki/pki-tomcat/ca/signedAudit/ca_audit
+    fields:
+      event.dataset: freeipa.ca_audit
+    fields_under_root: true
+    pipeline: freeipa-ca_audit
+
+  # IPA API (httpd error_log)
+  - type: filestream
+    id: freeipa-ipa-api
+    paths:
+      - /var/log/freeipa/httpd/error_log
+    fields:
+      event.dataset: freeipa.ipa_api
+    fields_under_root: true
+    pipeline: freeipa-ipa_api
+    include_lines: ['ipa: INFO:']
+
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+  indices:
+    - index: "logs-freeipa.kdc-default"
+      when.equals:
+        event.dataset: "freeipa.kdc"
+    - index: "logs-freeipa.directory_access-default"
+      when.equals:
+        event.dataset: "freeipa.directory_access"
+    - index: "logs-freeipa.directory_errors-default"
+      when.equals:
+        event.dataset: "freeipa.directory_errors"
+    - index: "logs-freeipa.ca_audit-default"
+      when.equals:
+        event.dataset: "freeipa.ca_audit"
+    - index: "logs-freeipa.ipa_api-default"
+      when.equals:
+        event.dataset: "freeipa.ipa_api"
+
+logging.level: info

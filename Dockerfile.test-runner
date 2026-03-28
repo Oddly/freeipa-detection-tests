@@ -1,0 +1,12 @@
+FROM rockylinux:9
+
+RUN dnf install -y \
+    freeipa-client \
+    openldap-clients \
+    jq \
+    curl \
+    bind-utils \
+    && dnf clean all
+
+# krb5.conf will be configured at runtime by ipa-client-install
+WORKDIR /tests
