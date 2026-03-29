@@ -100,12 +100,8 @@ podman exec freeipa bash /tmp/fix-kdc-symlink.sh
 
 echo ""
 echo "=== Step 4: Creating test users ==="
-podman exec freeipa bash -c "
-echo '$IPA_PASSWORD' | kinit admin@EXAMPLE.TEST 2>/dev/null
-for i in \$(seq 1 20); do
-    ipa user-add \"testuser\$i\" --first Test --last \"User\$i\" --random 2>/dev/null >/dev/null
-done
-echo 'Created 20 test users'
+podman cp "$SCRIPT_DIR/scripts/create-test-users.sh" freeipa:/tmp/create-test-users.sh
+IPA_ADMIN_PASSWORD="$IPA_PASSWORD" podman exec -e IPA_ADMIN_PASSWORD="$IPA_PASSWORD" freeipa bash /tmp/create-test-users.sh
 "
 
 echo ""
