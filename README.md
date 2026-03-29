@@ -28,13 +28,11 @@ curl -sL https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agen
     --insecure
 '
 
-# 4. Fix the KDC log symlink (required for container deployments)
-podman exec freeipa bash /scripts/fix-kdc-symlink.sh
 
-# 5. Import detection rules into Kibana
+# 4. Import detection rules into Kibana
 # Use the rules/freeipa_rules.ndjson file via the detection engine API
 
-# 6. Run attack simulations
+# 5. Run attack simulations
 podman exec freeipa bash /tests/test_01_kerberos_brute_force.sh
 ```
 
@@ -80,17 +78,12 @@ Build the FreeIPA package with `elastic-package build` and place the output dire
 
 ```
 podman-compose.yml          Podman services (FreeIPA only, no ES/Kibana)
-Dockerfile.test-runner      Rocky 9 with freeipa-client and ldap tools
 Makefile                    make up / make test / make clean
-filebeat/filebeat.yml       Filebeat config (alternative to Elastic Agent)
-pipelines/                  Ingest pipelines from the FreeIPA integration
-rules/freeipa_rules.ndjson  All 16 detection rules in Kibana import format
+rules/freeipa_rules.ndjson  All 27 detection rules in Kibana import format
 scripts/
-  run-tests.sh              Main test orchestrator
-  fix-kdc-symlink.sh        Workaround for container KDC log symlink
 tests/
   lib.sh                    Shared functions (kinit, ldapsearch, alert check)
-  test_01_*.sh - test_22_*.sh   One script per detection rule
+  test_*.sh   One script per detection rule
 ```
 
 ## Detection Rules Tested
@@ -116,7 +109,6 @@ tests/
 
 ## Known Issues
 
-- **KDC log symlink**: FreeIPA containers symlink `/var/log/krb5kdc.log` to `/data/var/log/krb5kdc.log`. The Elastic Agent filestream input needs `prospector.scanner.symlinks: true` (fixed in integration v0.1.2+) or the `fix-kdc-symlink.sh` workaround.
 - **IPA API logging**: API operations are logged at INFO level regardless of the `debug` setting in `/etc/ipa/default.conf`. No special configuration is needed for the `ipa_api` data stream.
 - **Docker not supported**: FreeIPA requires systemd which Docker cannot provide. Use Podman.
 - **LDAP Mass Exfiltration threshold**: The rule fires at 500+ entries returned. Small test instances with fewer than 500 LDAP objects will need additional users created (the test scripts create 500+ users).

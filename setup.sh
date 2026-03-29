@@ -13,7 +13,6 @@
 # This script will:
 #   1. Start a FreeIPA server in Podman
 #   2. Install and enroll Elastic Agent
-#   3. Fix the KDC log symlink
 #   4. Create test users for attack simulations
 #   5. Import detection rules into Kibana
 #   6. Print next steps
@@ -84,6 +83,8 @@ for i in $(seq 1 60); do
 done
 
 echo ""
+
+echo ""
 echo "=== Step 2: Installing Elastic Agent ==="
 podman exec freeipa bash -c "
 curl -sL https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-${AGENT_VERSION}-linux-x86_64.tar.gz | tar xz -C /opt/
@@ -94,18 +95,13 @@ curl -sL https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agen
 "
 
 echo ""
-echo "=== Step 3: Fixing KDC log symlink ==="
-podman cp "$SCRIPT_DIR/scripts/fix-kdc-symlink.sh" freeipa:/tmp/fix-kdc-symlink.sh
-podman exec freeipa bash /tmp/fix-kdc-symlink.sh
-
-echo ""
-echo "=== Step 4: Creating test users ==="
+echo "=== Step 3: Creating test users ==="
 podman cp "$SCRIPT_DIR/scripts/create-test-users.sh" freeipa:/tmp/create-test-users.sh
 IPA_ADMIN_PASSWORD="$IPA_PASSWORD" podman exec -e IPA_ADMIN_PASSWORD="$IPA_PASSWORD" freeipa bash /tmp/create-test-users.sh
 "
 
 echo ""
-echo "=== Step 5: Importing detection rules ==="
+echo "=== Step 4: Importing detection rules ==="
 if [ -n "$KIBANA_URL" ]; then
     AUTH=""
     if [ -n "${KIBANA_USER:-}" ] && [ -n "${KIBANA_PASS:-}" ]; then
