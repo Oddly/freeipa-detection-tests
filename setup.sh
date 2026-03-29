@@ -95,7 +95,8 @@ curl -sL https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agen
 
 echo ""
 echo "=== Step 3: Fixing KDC log symlink ==="
-podman exec freeipa bash "$SCRIPT_DIR/scripts/fix-kdc-symlink.sh"
+podman cp "$SCRIPT_DIR/scripts/fix-kdc-symlink.sh" freeipa:/tmp/fix-kdc-symlink.sh
+podman exec freeipa bash /tmp/fix-kdc-symlink.sh
 
 echo ""
 echo "=== Step 4: Creating test users ==="
