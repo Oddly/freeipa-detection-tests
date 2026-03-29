@@ -117,7 +117,7 @@ tests/
 ## Known Issues
 
 - **KDC log symlink**: FreeIPA containers symlink `/var/log/krb5kdc.log` to `/data/var/log/krb5kdc.log`. The Elastic Agent filestream input needs `prospector.scanner.symlinks: true` (fixed in integration v0.1.2+) or the `fix-kdc-symlink.sh` workaround.
-- **IPA API requires debug=True**: The `ipa_api` data stream only works when `/etc/ipa/default.conf` has `debug = True`. Without it, the 8 API-based rules will not fire.
+- **IPA API logging**: API operations are logged at INFO level regardless of the `debug` setting in `/etc/ipa/default.conf`. No special configuration is needed for the `ipa_api` data stream.
 - **Docker not supported**: FreeIPA requires systemd which Docker cannot provide. Use Podman.
 - **LDAP Mass Exfiltration threshold**: The rule fires at 500+ entries returned. Small test instances with fewer than 500 LDAP objects will need additional users created (the test scripts create 500+ users).
 - **Trust Modification**: Requires `ipa-server-trust-ad` package installed. The `ipa trust-add` command will fail without a real AD domain but still generates an API log entry that triggers the rule.
