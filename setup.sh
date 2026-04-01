@@ -23,7 +23,7 @@ FLEET_URL=""
 TOKEN=""
 AGENT_VERSION="9.3.2"
 KIBANA_URL=""
-IPA_PASSWORD="Secret.123"
+IPA_PASSWORD="${IPA_ADMIN_PASSWORD:-}"
 INSECURE="--insecure"
 
 usage() {
@@ -39,7 +39,7 @@ usage() {
     echo "  --kibana-user USER    Kibana username (default: elastic)"
     echo "  --kibana-pass PASS    Kibana password"
     echo "  --ca-cert PATH        CA certificate for Fleet TLS (disables --insecure)"
-    echo "  --ipa-password PASS   FreeIPA admin password (default: Secret.123)"
+    echo "  --ipa-password PASS   FreeIPA admin password (required)"
     exit 1
 }
 

@@ -5,7 +5,7 @@
 # Run inside the FreeIPA container: podman exec freeipa bash /scripts/create-test-users.sh
 
 set -euo pipefail
-IPA_PASSWORD="${IPA_ADMIN_PASSWORD:-Secret.123}"
+IPA_PASSWORD="${IPA_ADMIN_PASSWORD:?Set IPA_ADMIN_PASSWORD}"
 
 echo "$IPA_PASSWORD" | kinit admin@EXAMPLE.TEST 2>/dev/null
 

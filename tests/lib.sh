@@ -4,7 +4,7 @@
 ES_URL="${ES_URL:-http://elasticsearch:9200}"
 KIBANA_URL="${KIBANA_URL:-http://kibana:5601}"
 IPA_SERVER="${IPA_SERVER:-ipa.example.test}"
-IPA_ADMIN_PASSWORD="${IPA_ADMIN_PASSWORD:-Secret.123}"
+IPA_ADMIN_PASSWORD="${IPA_ADMIN_PASSWORD:?Set IPA_ADMIN_PASSWORD}"
 
 log() { echo "[$(date '+%H:%M:%S')] $*"; }
 

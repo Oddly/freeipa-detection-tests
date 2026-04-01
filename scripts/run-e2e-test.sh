@@ -4,9 +4,9 @@
 # Requires: podman containers "freeipa" and "attacker" running.
 set -euo pipefail
 
-IPA_PW="${IPA_ADMIN_PASSWORD:-Secret.123}"
-KIBANA_URL="${KIBANA_URL:-https://172.30.1.13:5601}"
-KIBANA_AUTH="${KIBANA_AUTH:--u elastic:TBIkoV-lNHmxCFa9nYal}"
+IPA_PW="${IPA_ADMIN_PASSWORD:?Set IPA_ADMIN_PASSWORD}"
+KIBANA_URL="${KIBANA_URL:?Set KIBANA_URL (e.g. http://kibana:5601)}"
+KIBANA_AUTH="${KIBANA_AUTH:-}"  # Optional: "-u user:pass" or empty for no-auth
 CURL_KB="curl -sk $KIBANA_AUTH"
 
 log() { echo "[$(date '+%H:%M:%S')] $*"; }
@@ -42,13 +42,13 @@ TS=$(date +%s)
 podman exec freeipa bash -c "
 echo '$IPA_PW' | kinit admin@EXAMPLE.TEST 2>/dev/null
 ipa user-add e2eadmin_$TS --first E2E --last Admin --random 2>/dev/null >/dev/null
-kadmin.local -q 'cpw -pw E2EAdmin1! e2eadmin_$TS@EXAMPLE.TEST' 2>/dev/null >/dev/null
+kadmin.local -q 'cpw -pw ${IPA_PW}Admin1 e2eadmin_$TS@EXAMPLE.TEST' 2>/dev/null >/dev/null
 ipa group-add-member admins --users=e2eadmin_$TS 2>/dev/null >/dev/null
 echo 'Setup: new admin e2eadmin_$TS created'
 "
 
 # Establish attacker's testuser1 password
-podman exec freeipa kadmin.local -q "cpw -pw ExtAttack123! testuser1@EXAMPLE.TEST" 2>/dev/null
+podman exec freeipa kadmin.local -q "cpw -pw ${IPA_PW}Attack1 testuser1@EXAMPLE.TEST" 2>/dev/null
 
 log "Waiting 10 minutes for lookback windows to clear and baselines to build..."
 sleep 600
@@ -119,16 +119,20 @@ echo 'Anonymous binds done'
 "
 
 # --- Non-service enum: attacker binds as testuser1, wait for transform, then search ---
+# The BIND and RESULT must be on the same connection for the LOOKUP JOIN to match.
+# ldapsearch does BIND+SRCH in one connection, so we need the transform to process
+# the BIND before the rule evaluates. We do a throwaway bind first, wait 3min for
+# the transform cycle, then do the real enumeration.
 podman exec attacker bash -c "
-ldapsearch -x -H ldap://ipa.example.test -D 'uid=testuser1,cn=users,cn=accounts,dc=example,dc=test' -w 'ExtAttack123!' -b '' -s base 2>/dev/null >/dev/null
-echo 'Attacker BIND done, waiting 120s for transform sync...'
-sleep 120
-ldapsearch -x -H ldap://ipa.example.test -D 'uid=testuser1,cn=users,cn=accounts,dc=example,dc=test' -w 'ExtAttack123!' -b 'dc=example,dc=test' '(objectclass=*)' dn 2>/dev/null | tail -1
+ldapsearch -x -H ldap://ipa.example.test -D 'uid=testuser1,cn=users,cn=accounts,dc=example,dc=test' -w '${IPA_PW}Attack1' -b '' -s base 2>/dev/null >/dev/null
+echo 'Attacker BIND done, waiting 180s for transform sync...'
+sleep 180
+ldapsearch -x -H ldap://ipa.example.test -D 'uid=testuser1,cn=users,cn=accounts,dc=example,dc=test' -w '${IPA_PW}Attack1' -b 'dc=example,dc=test' '(objectclass=*)' dn 2>/dev/null | tail -1
 echo 'Non-service enum done'
 "
 
 # --- Successful auth from attacker IP ---
-podman exec attacker bash -c "echo 'ExtAttack123!' | kinit testuser1@EXAMPLE.TEST 2>/dev/null && echo 'External auth OK'"
+podman exec attacker bash -c "echo '${IPA_PW}Attack1' | kinit testuser1@EXAMPLE.TEST 2>/dev/null && echo 'External auth OK'"
 
 # --- IPA API attacks ---
 podman exec freeipa bash -c "
@@ -146,16 +150,15 @@ for i in \$(seq 1 6); do ipa user-del e2ev_\${TS}_\$i 2>/dev/null >/dev/null; do
 echo 'IPA API attacks done'
 "
 
-# --- Credential search: temporarily weaken ACL ---
+# --- Credential search: temporarily weaken ACL, search as testuser1 (simple bind) ---
 podman exec freeipa bash -c "
-echo '$IPA_PW' | kinit admin@EXAMPLE.TEST 2>/dev/null
 ldapmodify -x -H ldap://localhost -D 'cn=Directory Manager' -w '$IPA_PW' 2>/dev/null <<LDIF
 dn: dc=example,dc=test
 changetype: modify
 add: aci
 aci: (targetattr = \"userPassword\")(version 3.0; acl \"temp-e2e-test\"; allow (read,search,compare) userdn = \"ldap:///all\";)
 LDIF
-ldapsearch -Y GSSAPI -H ldap://localhost -b 'cn=users,cn=accounts,dc=example,dc=test' -s sub '(userPassword=*)' dn 2>/dev/null | tail -1
+ldapsearch -x -H ldap://ipa.example.test -D 'uid=testuser1,cn=users,cn=accounts,dc=example,dc=test' -w '${IPA_PW}Attack1' -b 'cn=users,cn=accounts,dc=example,dc=test' -s sub '(userPassword=*)' dn 2>/dev/null | tail -1
 ldapmodify -x -H ldap://localhost -D 'cn=Directory Manager' -w '$IPA_PW' 2>/dev/null <<LDIF
 dn: dc=example,dc=test
 changetype: modify
@@ -200,12 +203,20 @@ LDIF
 echo 'Config mod done'
 "
 
-# --- S4U2Proxy delegation ---
+# --- S4U2Proxy delegation: configure delegation rule, then perform S4U2Proxy ---
 podman exec freeipa bash -c "
+echo '$IPA_PW' | kinit admin@EXAMPLE.TEST 2>/dev/null
+ipa servicedelegationrule-add e2e-s4u2proxy 2>/dev/null >/dev/null || true
+ipa servicedelegationrule-add-member e2e-s4u2proxy --principals='HTTP/ipa.example.test@EXAMPLE.TEST' 2>/dev/null >/dev/null || true
+ipa servicedelegationtarget-add e2e-s4u2proxy-target 2>/dev/null >/dev/null || true
+ipa servicedelegationtarget-add-member e2e-s4u2proxy-target --principals='ldap/ipa.example.test@EXAMPLE.TEST' 2>/dev/null >/dev/null || true
+ipa servicedelegationrule-add-target e2e-s4u2proxy --servicedelegationtargets=e2e-s4u2proxy-target 2>/dev/null >/dev/null || true
 kadmin.local -q 'ktadd -k /tmp/http_e2e.keytab HTTP/ipa.example.test@EXAMPLE.TEST' 2>/dev/null >/dev/null
 kinit -k -t /tmp/http_e2e.keytab HTTP/ipa.example.test@EXAMPLE.TEST 2>/dev/null
-kvno -U admin ldap/ipa.example.test@EXAMPLE.TEST 2>/dev/null
+kvno -U admin ldap/ipa.example.test@EXAMPLE.TEST 2>&1
 echo 'S4U2Proxy done'
+ipa servicedelegationrule-del e2e-s4u2proxy 2>/dev/null >/dev/null || true
+ipa servicedelegationtarget-del e2e-s4u2proxy-target 2>/dev/null >/dev/null || true
 "
 
 # --- New host enrollment with unique name ---
@@ -217,7 +228,7 @@ echo 'Host enrollment done'
 
 # --- First API command by the new admin created in SETUP ---
 podman exec freeipa bash -c "
-echo 'E2EAdmin1!' | kinit e2eadmin_$TS@EXAMPLE.TEST 2>/dev/null
+echo '${IPA_PW}Admin1' | kinit e2eadmin_$TS@EXAMPLE.TEST 2>/dev/null
 ipa stageuser-find --sizelimit=1 2>/dev/null | head -1
 ipa vault-find --sizelimit=1 2>/dev/null | head -1
 echo 'First API command done'

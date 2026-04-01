@@ -5,14 +5,14 @@ services:
     container_name: freeipa
     environment:
       IPA_SERVER_HOSTNAME: ipa.example.test
-      PASSWORD: ${IPA_ADMIN_PASSWORD:-Secret.123}
+      PASSWORD: ${IPA_ADMIN_PASSWORD:?Set IPA_ADMIN_PASSWORD}
     command:
       - ipa-server-install
       - --unattended
       - --realm=EXAMPLE.TEST
       - --domain=example.test
-      - --ds-password=${IPA_ADMIN_PASSWORD:-Secret.123}
-      - --admin-password=${IPA_ADMIN_PASSWORD:-Secret.123}
+      - --ds-password=${IPA_ADMIN_PASSWORD}
+      - --admin-password=${IPA_ADMIN_PASSWORD}
       - --no-ntp
       - --no-host-dns
       - --skip-mem-check
@@ -22,7 +22,7 @@ services:
     volumes:
       - freeipa-data:/data:Z
     healthcheck:
-      test: ["CMD", "bash", "-c", "echo Secret.123 | kinit admin 2>/dev/null && ipa user-find --sizelimit=1 >/dev/null 2>&1"]
+      test: ["CMD", "bash", "-c", "echo $PASSWORD | kinit admin 2>/dev/null && ipa user-find --sizelimit=1 >/dev/null 2>&1"]
       interval: 30s
       timeout: 15s
       retries: 40
